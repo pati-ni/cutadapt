@@ -130,7 +130,7 @@ class ColorspaceSequence(Sequence):
 				"sequence ({1}) and length of read ({2}) do not match (primer "
 				"is: {3!r})".format(rname, len(qualities), len(sequence), self.primer))
 		super(ColorspaceSequence, self).__init__(name, sequence, qualities, second_header, match, match_info)
-		if not self.primer in ('A', 'C', 'G', 'T'):
+		if self.primer not in ('', 'A', 'C', 'G', 'T'):
 			raise FormatError("Primer base is {0!r} in read {1!r}, but it "
 				"should be one of A, C, G, T.".format(
 					self.primer, _shorten(name)))

@@ -137,7 +137,7 @@ class Pipeline(object):
 		return stats
 
 
-def reader_process(reader, reads_queue, threads=1):  # TODO remove =1
+def reader_process(reader, reads_queue, threads):
 	reads = []
 	try:
 		for read in reader:
@@ -148,6 +148,7 @@ def reader_process(reader, reads_queue, threads=1):  # TODO remove =1
 		if reads:
 			reads_queue.put(reads)
 
+		# send poison pills
 		for _ in range(threads):
 			reads_queue.put('STOP')  # TODO PY3 bytes
 
@@ -156,36 +157,93 @@ def reader_process(reader, reads_queue, threads=1):  # TODO remove =1
 		reads_queue.put((e, traceb))
 
 
+def modifier_worker(read_queue, modifiers, filters, result_queue):
+	print('modifier worker started')
+	n = 0  # no. of processed reads  # TODO turn into attribute
+	total_bp = 0
+	try:
+		for reads in iter(read_queue.get, 'STOP'):
+			print('in modifier_worker: got {} reads'.format(len(reads)))
+			if isinstance(reads, tuple):
+				ex, tb = reads
+				result_queue.put((ex, tb))
+				return
+			results = []
+			for read in reads:
+				n += 1
+				total_bp += len(read.sequence)
+				for modifier in modifiers:
+					read = modifier(read)
+				for filter in filters:
+					if filter(read):
+						break
+				WORKING_HERE
+
+				results.append(read)
+			print('sending results', results)
+			result_queue.put(results)
+		result_queue.put('STOP')
+	except Exception as e:
+		traceb = traceback.format_exc()
+		result_queue.put((e, traceb))
+
+	#return (n, total_bp, None)
+
+
 class SingleEndPipeline(Pipeline):
 	"""
 	Processing pipeline for single-end reads
 	"""
 	def __init__(self, reader, modifiers, filters):
 		super(SingleEndPipeline, self).__init__()
-		self._reader_queue = Queue(maxsize=100)
-		self._reader_process = Process(target=reader_process, args=(reader, self._reader_queue))
-		self._reader_process.daemon = True
-		self._reader_process.start()
+		threads = 3
+		self._read_queue = Queue(maxsize=100)
+		self._read_process = Process(target=reader_process, args=(reader, self._read_queue, threads))
+		self._read_process.daemon = True
+		self._read_process.start()
+
+		self._result_queue = Queue(maxsize=100)
+		self._workers = []
+		for p in range(threads):
+			worker = Process(target=modifier_worker, args=(self._read_queue, modifiers, self._result_queue))
+			worker.daemon = True
+			worker.start()
+			self._workers.append(worker)
+
 		self.modifiers = modifiers
 		self.filters = filters
 
 	def process_reads(self):
 		"""Run the pipeline. Return statistics"""
+		try:
+			for _ in range(len(self._workers)):  # TODO self.threads
+				for reads in iter(self._result_queue.get, 'STOP'):
+					if isinstance(reads, tuple):
+						ex, tb = reads
+						raise ex
+		finally:
+			for worker in self._workers:
+				worker.terminate()  # TODO
+				worker.join()
+			self._read_process.terminate()  # TODO
+			self._read_process.join()
+
 		n = 0  # no. of processed reads  # TODO turn into attribute
 		total_bp = 0
-		for reads in iter(self._reader_queue.get, 'STOP'):
-			if isinstance(reads, tuple):
-				e, tb = reads
-				raise e  # TODO use traceback from the original exception
-			for read in reads:
-				n += 1
-				total_bp += len(read.sequence)
-				for modifier in self.modifiers:
-					read = modifier(read)
-				for filter in self.filters:
-					if filter(read):
-						break
-		return (n, total_bp, None)
+		# for reads in iter(self._reader_queue.get, 'STOP'):
+		# 	if isinstance(reads, tuple):
+		# 		e, tb = reads
+		# 		raise e  # TODO use traceback from the original exception
+		# 	for read in reads:
+		# 		n += 1
+		# 		total_bp += len(read.sequence)
+		# 		for modifier in self.modifiers:
+		# 			read = modifier(read)
+		# 		for filter in self.filters:
+		# 			if filter(read):
+		# 				break
+		return 1, 10, None
+		#return (n, total_bp, None)
 
 
 class PairedEndPipeline(Pipeline):

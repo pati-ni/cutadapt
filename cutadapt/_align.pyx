@@ -205,6 +205,9 @@ cdef class Aligner:
 		self._insertion_cost = 1
 		self._deletion_cost = 1
 
+	def __reduce__(self):
+		return (Aligner, (self.str_reference, self.max_error_rate, self.flags, self.wildcard_ref, self.wildcard_query))
+
 	property min_overlap:
 		def __get__(self):
 			return self._min_overlap
