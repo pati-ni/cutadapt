@@ -157,13 +157,11 @@ def reader_process(reader, reads_queue, threads):
 		reads_queue.put((e, traceb))
 
 
-def modifier_worker(read_queue, modifiers, filters, result_queue):
-	print('modifier worker started')
+def modifier_worker(read_queue, modifiers, result_queue):
 	n = 0  # no. of processed reads  # TODO turn into attribute
 	total_bp = 0
 	try:
 		for reads in iter(read_queue.get, 'STOP'):
-			print('in modifier_worker: got {} reads'.format(len(reads)))
 			if isinstance(reads, tuple):
 				ex, tb = reads
 				result_queue.put((ex, tb))
@@ -174,13 +172,8 @@ def modifier_worker(read_queue, modifiers, filters, result_queue):
 				total_bp += len(read.sequence)
 				for modifier in modifiers:
 					read = modifier(read)
-				for filter in filters:
-					if filter(read):
-						break
-				WORKING_HERE
 
 				results.append(read)
-			print('sending results', results)
 			result_queue.put(results)
 		result_queue.put('STOP')
 	except Exception as e:
@@ -221,6 +214,10 @@ class SingleEndPipeline(Pipeline):
 					if isinstance(reads, tuple):
 						ex, tb = reads
 						raise ex
+					for read in reads:
+						for filter in self.filters:
+							if filter(read):
+								break
 		finally:
 			for worker in self._workers:
 				worker.terminate()  # TODO
