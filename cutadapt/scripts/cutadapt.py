@@ -71,6 +71,8 @@ import platform
 import textwrap
 import traceback
 from multiprocessing import Process, Queue
+import multiprocessing
+import cProfile
 
 from xopen import xopen
 from cutadapt import seqio, __version__
@@ -157,6 +159,16 @@ def reader_process(reader, reads_queue, threads):
 		reads_queue.put((e, traceb))
 
 
+def profile_reader(reader, reads_queue, threads):
+	cProfile.runctx('reader_process(reader, reads_queue, threads)', globals(), locals(), 'profile_reader.prof')
+
+
+def profile_worker(read_queue, modifiers, result_queue):
+	cProfile.runctx('modifier_worker(read_queue, modifiers, result_queue)', globals(), locals(),
+		'profile_worker-{}.prof'.format(multiprocessing.current_process().name))
+
+
+
 def modifier_worker(read_queue, modifiers, result_queue):
 	n = 0  # no. of processed reads  # TODO turn into attribute
 	total_bp = 0
@@ -189,16 +201,16 @@ class SingleEndPipeline(Pipeline):
 	"""
 	def __init__(self, reader, modifiers, filters):
 		super(SingleEndPipeline, self).__init__()
-		threads = 3
-		self._read_queue = Queue(maxsize=100)
-		self._read_process = Process(target=reader_process, args=(reader, self._read_queue, threads))
+		threads = 2
+		self._read_queue = Queue(maxsize=1000)
+		self._read_process = Process(target=profile_reader, args=(reader, self._read_queue, threads))
 		self._read_process.daemon = True
 		self._read_process.start()
 
-		self._result_queue = Queue(maxsize=100)
+		self._result_queue = Queue(maxsize=1000)
 		self._workers = []
 		for p in range(threads):
-			worker = Process(target=modifier_worker, args=(self._read_queue, modifiers, self._result_queue))
+			worker = Process(target=profile_worker, args=(self._read_queue, modifiers, self._result_queue))
 			worker.daemon = True
 			worker.start()
 			self._workers.append(worker)
