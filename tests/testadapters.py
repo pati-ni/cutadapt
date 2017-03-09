@@ -6,6 +6,7 @@ from cutadapt.seqio import Sequence
 from cutadapt.adapters import (Adapter, Match, ColorspaceAdapter, FRONT, BACK,
 	parse_braces, LinkedAdapter)
 
+
 def test_issue_52():
 	adapter = Adapter(
 		sequence='GAACTCCAGTCACNNNNN',
@@ -109,7 +110,6 @@ def test_info_record():
 	read = Sequence(name="abc", sequence='CCCCAGAACTACAGTCCCGGC')
 	am = Match(astart=0, astop=17, rstart=5, rstop=21, matches=15, errors=2, front=None, 
 		adapter=adapter, read=read)
-	print(am.get_info_record())
 	assert am.get_info_record() == (
 		"abc",
 		2,

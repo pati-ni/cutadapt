@@ -266,9 +266,10 @@ def print_report(stats):
 
 			print("=" * 3, extra + "Adapter", adapter.name, "=" * 3)
 			print()
+
 			if where == LINKED:
 				print("Sequence: {0}...{1}; Type: linked; Length: {2}+{3}; "
-				      "5' trimmed: {4} times; 3' trimmed: {5} times".format(
+					"5' trimmed: {4} times; 3' trimmed: {5} times".format(
 						adapter.front_adapter.sequence,
 						adapter.back_adapter.sequence,
 						len(adapter.front_adapter.sequence),

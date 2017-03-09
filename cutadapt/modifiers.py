@@ -40,6 +40,9 @@ class AdapterCutter(object):
 
 		Return either a Match instance or None if there are no matches.
 		"""
+		# TODO
+		# try to sort adapters by length, longest first, break when current best
+		# match is longer than length of next adapter to try
 		best = None
 		for adapter in self.adapters:
 			match = adapter.match_to(read)
@@ -54,10 +57,10 @@ class AdapterCutter(object):
 	def _write_info(self, read):
 		"""
 		Write to the info, wildcard and rest files.
+		"""
 		# TODO
 		# This design with a read having a .match attribute and
 		# a match having a .read attribute is really confusing.
-		"""
 		match = read.match
 		if self.rest_writer and match:
 			self.rest_writer.write(match)
@@ -66,7 +69,7 @@ class AdapterCutter(object):
 			print(match.wildcards(), read.name, file=self.wildcard_file)
 
 		if self.info_file:
-			if read.match_info:
+			if read.match_info:  # TODO pass this in as a parameter, not as an attribute of read
 				for m in read.match_info:
 					print(*m, sep='\t', file=self.info_file)
 			else:
@@ -104,7 +107,7 @@ class AdapterCutter(object):
 			trimmed_read.match_info = None
 			self._write_info(trimmed_read)
 			return trimmed_read
-		
+
 		if __debug__:
 			assert len(trimmed_read) < len(read), "Trimmed read isn't shorter than original"
 
@@ -261,7 +264,7 @@ class QualityTrimmer(object):
 
 
 class Shortener(object):
-	"""Uncoditionally shorten a read to the given length"""
+	"""Unconditionally shorten a read to the given length"""
 	def __init__(self, length):
 		self.length = length
 

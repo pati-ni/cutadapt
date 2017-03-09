@@ -271,7 +271,7 @@ class Match(object):
 				qualities[self.rstop:]
 			)
 		else:
-			info += ('','','')
+			info += ('', '', '')
 		
 		return info
 
@@ -310,11 +310,12 @@ class Adapter(object):
 	name -- optional name of the adapter. If not provided, the name is set to a
 		unique number.
 	"""
+
 	def __init__(self, sequence, where, max_error_rate=0.1, min_overlap=3,
 			read_wildcards=False, adapter_wildcards=True, name=None, indels=True):
 		self.debug = False
 		self.name = _generate_adapter_name() if name is None else name
-		self.sequence = parse_braces(sequence.upper().replace('U', 'T'))
+		self.sequence = parse_braces(sequence.upper().replace('U', 'T'))  # TODO move away
 		if not self.sequence:
 			raise ValueError('Sequence is empty')
 		self.where = where
@@ -353,7 +354,7 @@ class Adapter(object):
 			self.aligner.indel_cost = 100000
 
 	def __repr__(self):
-		return '<Adapter(name="{name}", sequence="{sequence}", where={where}, '\
+		return '<Adapter(name={name!r}, sequence={sequence!r}, where={where}, '\
 			'max_error_rate={max_error_rate}, min_overlap={min_overlap}, '\
 			'read_wildcards={read_wildcards}, '\
 			'adapter_wildcards={adapter_wildcards}, '\
@@ -449,7 +450,16 @@ class Adapter(object):
 
 
 class ColorspaceAdapter(Adapter):
+	"""
+	An Adapter, but in color space. It does not support all adapter types
+	(see the 'where' parameter).
+	"""
+
 	def __init__(self, *args, **kwargs):
+		"""
+		sequence -- the adapter sequence as a str, can be given in nucleotide space or in color space
+		where -- PREFIX, FRONT, BACK
+		"""
 		super(ColorspaceAdapter, self).__init__(*args, **kwargs)
 		has_nucleotide_seq = False
 		if set(self.sequence) <= set('ACGT'):
