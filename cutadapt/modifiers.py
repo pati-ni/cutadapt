@@ -7,8 +7,29 @@ need to be stored, and as a class with a __call__ method if there are parameters
 """
 from __future__ import print_function, division, absolute_import
 import re
+from collections import defaultdict
+
+from cutadapt.adapters import LinkedMatch
 from cutadapt.qualtrim import quality_trim_index, nextseq_trim_index
 from cutadapt.compat import maketrans
+
+
+class AdapterStatistics(object):
+	def __init__(self, adapter):
+		self.adapter = adapter
+		self.errors_front = defaultdict(lambda: defaultdict(int))
+		self.errors_back = defaultdict(lambda: defaultdict(int))
+		self.adjacent_bases = {'A': 0, 'C': 0, 'G': 0, 'T': 0, '': 0}
+
+	@property
+	def lengths_front(self):
+		d = {length: sum(errors.values()) for length, errors in self.errors_front.items()}
+		return d
+
+	@property
+	def lengths_back(self):
+		d = {length: sum(errors.values()) for length, errors in self.errors_back.items()}
+		return d
 
 
 class AdapterCutter(object):
@@ -32,7 +53,8 @@ class AdapterCutter(object):
 		self.rest_writer = rest_writer
 		self.action = action
 		self.with_adapters = 0
-		self.keep_match_info = self.info_file is not None
+		self.keep_match_info = self.info_file is not None  # TODO what is this needed for?
+		self.adapter_statistics = {a: AdapterStatistics(a) for a in adapters}
 
 	def _best_match(self, read):
 		"""
@@ -100,8 +122,22 @@ class AdapterCutter(object):
 				# nothing found
 				break
 			matches.append(match)
-			trimmed_read = match.adapter.trimmed(match)
-		
+			trimmed_read = match.trimmed()
+
+			# Update statistics
+			stats = self.adapter_statistics[match.adapter]
+			stats.adjacent_bases[match.adjacent_base] += 1
+			if isinstance(match, LinkedMatch):
+				# TODO remove special-casing of LinkedMatch
+				if match.front_match:
+					stats.errors_front[match.front_match.removed_bases][match.front_match.errors] += 1
+				if match.back_match:
+					stats.errors_back[match.back_match.removed_bases][match.back_match.errors] += 1
+			elif match.remove_before:
+				stats.errors_front[match.removed_bases][match.errors] += 1
+			else:
+				stats.errors_back[match.removed_bases][match.errors] += 1
+
 		if not matches:
 			trimmed_read.match = None
 			trimmed_read.match_info = None
@@ -119,9 +155,9 @@ class AdapterCutter(object):
 			masked_sequence = trimmed_read.sequence
 			for match in sorted(matches, reverse=True, key=lambda m: m.astart):
 				ns = 'N' * (len(match.read.sequence) -
-							len(match.adapter.trimmed(match).sequence))
+							len(match.trimmed().sequence))  # TODO is this correct? -> stats?
 				# add N depending on match position
-				if match.front:
+				if match.remove_before:
 					masked_sequence = ns + masked_sequence
 				else:
 					masked_sequence += ns
