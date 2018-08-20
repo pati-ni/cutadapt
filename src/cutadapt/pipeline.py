@@ -367,9 +367,9 @@ def reader_process(file, file2, connections, queue, buffer_size, stdin_fd):
 		sys.stdin.close()
 		sys.stdin = os.fdopen(stdin_fd)
 	try:
-		with xopen(file, 'rb') as f:
+		with xopen(file, 'rb', buffering = True) as f:
 			if file2:
-				with xopen(file2, 'rb') as f2:
+				with xopen(file2, 'rb', buffering = True) as f2:
 					for chunk_index, (chunk1, chunk2) in enumerate(read_paired_chunks(f, f2, buffer_size)):
 						# Determine the worker that should get this chunk
 						worker_index = queue.get()
